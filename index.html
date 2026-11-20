@@ -1,0 +1,119 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Agent Forge: give your website an agent</title>
+  <meta name="description" content="Agent Forge builds, checks and tests an agent network for your website in the browser, then gives you a folder that publishes it as an open agentic website. No server, no Node.">
+  <link rel="icon" href="favicon.svg" type="image/svg+xml">
+  <link rel="stylesheet" href="forge.css">
+  <script type="module" src="site.js"></script>
+</head>
+<body>
+  <a class="skip" href="#workspace">Skip to the workspace</a>
+  <header class="top">
+    <a class="brand" href="./" aria-label="Agent Forge home">
+      <svg viewBox="0 0 32 32" width="28" height="28" aria-hidden="true"><path d="M5 26h22l-3-7H8z" fill="currentColor"/><path d="M9 17h14l-2-5h-5l-1-6-3 6H9z" fill="none" stroke="currentColor" stroke-width="2" stroke-linejoin="round"/></svg>
+      <span>Agent Forge</span>
+    </a>
+    <nav aria-label="Sections">
+      <a href="#templates-title">Start</a>
+      <a href="#workspace">Workspace</a>
+      <a href="#assistant">Ask Forge</a>
+      <a href="#about">How it works</a>
+    </nav>
+  </header>
+
+  <main>
+    <section class="hero" aria-labelledby="hero-title">
+      <p class="eyebrow">Open agentic web · build</p>
+      <h1 id="hero-title">Give your website an agent. No server, no Node.</h1>
+      <p class="lead">Today, publishing an agent network means installing Node, running a coding agent and copying runtime files by hand. Agent Forge does it in the browser. Describe your site, write down its facts, check the network against the open agentic web specification as you type, try it in a chat, then download a folder that publishes it on any static host.</p>
+      <ol class="steps">
+        <li><strong>Start</strong> from a template or ask the assistant.</li>
+        <li><strong>Edit</strong> the facts and the agents.</li>
+        <li><strong>Check</strong> against the spec, live.</li>
+        <li><strong>Try</strong> it in a chat.</li>
+        <li><strong>Download</strong> and publish.</li>
+      </ol>
+    </section>
+
+    <section aria-labelledby="templates-title">
+      <h2 id="templates-title">1. Start</h2>
+      <p class="muted">A template replaces your draft. Undo brings it back.</p>
+      <div id="templates" class="templates"></div>
+    </section>
+
+    <section id="workspace" aria-labelledby="workspace-title">
+      <div class="section-head">
+        <div>
+          <h2 id="workspace-title">2. Build, check and try</h2>
+          <p id="forge-status" role="status" aria-live="polite" data-error="false" class="muted">Your draft is saved in this browser only.</p>
+        </div>
+        <div class="toolbar">
+          <button type="button" id="undo" disabled>Undo</button>
+          <label class="file-button">Import<input type="file" id="import" accept=".json,application/json" hidden></label>
+          <button type="button" id="export" class="primary">Download site folder (.zip)</button>
+        </div>
+      </div>
+      <div class="workspace">
+        <div class="editor">
+          <section class="card" aria-labelledby="site-title"><h3 id="site-title">Site</h3><div id="editor-site"></div></section>
+          <section class="card" aria-labelledby="agents-title"><h3 id="agents-title">Agents</h3><div id="editor-agents"></div></section>
+          <section class="card" aria-labelledby="peers-title"><h3 id="peers-title">Peers (optional)</h3><div id="editor-peers"></div></section>
+        </div>
+        <aside class="panel" aria-label="Checks and preview">
+          <div class="panel-head">
+            <div role="tablist" aria-label="Panel">
+              <button type="button" role="tab" data-tab="checks" aria-selected="true">Checks</button>
+              <button type="button" role="tab" data-tab="try" aria-selected="false">Try it</button>
+              <button type="button" role="tab" data-tab="files" aria-selected="false">Files</button>
+            </div>
+            <span id="score-badge" class="badge" data-tone="none">Checking…</span>
+          </div>
+          <div id="panel-body" class="panel-body"></div>
+        </aside>
+      </div>
+    </section>
+
+    <section id="assistant" class="assistant" aria-labelledby="assistant-heading">
+      <h2 id="assistant-heading">3. Or ask Forge to draft it</h2>
+      <p>Forge's own agent network edits the draft above for you: it proposes the agents, writes grounded instructions from the facts you give it, checks the result, and fixes what fails. You see every change and can undo it. It uses your own LLM provider and key.</p>
+      <p class="assistant-note">Your messages and the draft go to the LLM provider you choose in the settings below. Forge has no server and never sees your key.</p>
+      <p id="assistant-status" role="status">Connecting the assistant… If this message stays, the assistant could not load. The workspace above still works.</p>
+      <div id="agent-app">
+        <div data-ns-slot="header"></div>
+        <div class="assistant-panels">
+          <div data-ns-slot="chat"></div>
+          <div data-ns-slot="agents"></div>
+        </div>
+        <div data-ns-slot="settings"></div>
+      </div>
+    </section>
+
+    <section id="about" aria-labelledby="about-title">
+      <h2 id="about-title">How it works</h2>
+      <div class="cols">
+        <article>
+          <h3>Grounded by design</h3>
+          <p>Every agent Forge writes answers only from the site facts you give it, says so when it does not know, and treats visitor text as data. Forge warns you when facts are missing, still sample text, or so long that every visitor pays for them on every call.</p>
+        </article>
+        <article>
+          <h3>Checked as the spec says</h3>
+          <p>The linter reads the files your draft would publish, the way a calling browser does, and applies the same checks to a draft or a live site: MUST, SHOULD and MAY requirements, credentials in public text, peer allow-lists, execution limits. Try it on a published site from the command line:</p>
+          <pre><code>node validator/cli.mjs &lt;network URL&gt;</code></pre>
+        </article>
+        <article>
+          <h3>Callable by other sites</h3>
+          <p>Forge is itself an open agentic website. Its action bridge shares <code>validate_site</code> and <code>get_starter_templates</code>, so another site's agents can check a peer before they call it, or pick a starting template.</p>
+        </article>
+      </div>
+      <p class="muted small">Spec: <a href="https://github.com/cognizant-ai-labs/agentic-web/blob/main/docs/worldwide_agentic_web_mvp_spec.md">Minimum Viable Specification for a Worldwide Agentic Web</a>. Forge checks that a site is well formed. It does not run your agents against test questions, so a passing score does not prove the answers are right: use the Try it tab for that.</p>
+    </section>
+  </main>
+
+  <footer>
+    <p>Agent Forge is open source (Apache 2.0). The browser runtime in <code>runtime/</code> is nsdeploy's (Apache 2.0), taken as published in the agentic-web repository's agentify-website skill.</p>
+  </footer>
+</body>
+</html>

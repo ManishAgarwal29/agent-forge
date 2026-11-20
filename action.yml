@@ -1,0 +1,29 @@
+name: Agent Forge validate
+description: Check a published agent network against the open agentic web specification and fail the build below a score.
+inputs:
+  url:
+    description: Network URL, the folder that holds agent-manifest.json then the network name.
+    required: true
+  min-score:
+    description: Fail when the score is below this (0 to 100). A non-conformant site always fails.
+    required: false
+    default: "60"
+  origin:
+    description: The origin of the site that will call it, for the CORS comparison.
+    required: false
+    default: ""
+runs:
+  using: composite
+  steps:
+    - uses: actions/setup-node@v4
+      with:
+        node-version: 22
+    - shell: bash
+      env:
+        ATLAS_URL: ${{ inputs.url }}
+        ATLAS_MIN: ${{ inputs.min-score }}
+        ATLAS_ORIGIN: ${{ inputs.origin }}
+      run: |
+        args=("$ATLAS_URL" --min-score "$ATLAS_MIN")
+        if [ -n "$ATLAS_ORIGIN" ]; then args+=(--origin "$ATLAS_ORIGIN"); fi
+        node "${{ github.action_path }}/validator/cli.mjs" "${args[@]}"

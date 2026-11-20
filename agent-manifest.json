@@ -1,0 +1,86 @@
+{
+  "brand": "Agent Forge",
+  "networks": [
+    {
+      "name": "agent_forge",
+      "front_man": "forge_guide",
+      "hocon": "./agent_forge.network.json",
+      "description": "Drafts, checks and fixes an agent network for a website, from the facts its owner gives, and shows every change in the Forge workspace.",
+      "tags": [
+        "builder",
+        "authoring",
+        "validator"
+      ],
+      "sample_queries": [
+        "I run a small bakery. Here are our hours and prices. Build me an assistant.",
+        "Start from the cafe template and change it for my bookshop.",
+        "Why does my draft fail the checks, and can you fix it?",
+        "Add https://shutdown-clerk.pages.dev/shutdown_clerk as a peer, but only if it is safe.",
+        "Write me a mobile app."
+      ]
+    }
+  ],
+  "llm_router": {
+    "base_url": "https://api.otari.ai/api/v1",
+    "mock": false,
+    "byok_router": "https://api.otari.ai/api/v1"
+  },
+  "allowed_peers": [],
+  "peer_policy": {
+    "mode": "closed",
+    "deny_origins": [],
+    "note": "Local agents and page-local actions only."
+  },
+  "agent_mcp": {
+    "protocol": "nsdeploy-agent-mcp/v1",
+    "network": "agent_forge",
+    "front_man": "forge_guide",
+    "available": false,
+    "reason": "This is a static bundle; a public MCP facade requires an application host."
+  },
+  "theme": {
+    "primary": "#b4410a"
+  },
+  "linking": {
+    "protocol": "nsdeploy-link/v1",
+    "exports": [
+      {
+        "network": "agent_forge",
+        "front_man": "forge_guide",
+        "aliases": [
+          "agent_forge",
+          "forge_guide"
+        ],
+        "url": "agent_forge"
+      }
+    ],
+    "imports": [],
+    "link_updates": {
+      "mode": "browser-local"
+    }
+  },
+  "deployment": {
+    "mode": "static",
+    "self_contained_runtime": true,
+    "browser_mock": false,
+    "direct_byok": true,
+    "direct_mcp_requires_cors": true,
+    "public_mcp_facade": false
+  },
+  "actions": {
+    "version": 1,
+    "module": "./site-actions.js",
+    "bridge": "./bridge/action-bridge.html",
+    "agentTools": [
+      "get_project",
+      "update_site",
+      "upsert_agent",
+      "remove_agent",
+      "set_peers",
+      "run_checks",
+      "get_starter_templates",
+      "load_template",
+      "validate_site"
+    ]
+  }
+}
