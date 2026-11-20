@@ -1,5 +1,7 @@
 # Agent Forge
 
+**Live:** https://manishagarwal29.github.io/agent-forge/ � **Network URL:** `https://manishagarwal29.github.io/agent-forge/agent_forge`
+
 Agent Forge builds, checks and tests an agent network for a website in the browser, then gives you a folder that publishes it as an open agentic website. No server, no Node, no build step.
 
 Publishing an agent network today means installing Node, running a coding agent against the agentify-website skill, and copying runtime files by hand. Forge replaces that with a workspace for a site owner who has never built an agent.
@@ -54,7 +56,7 @@ The assistant needs an LLM key that you enter in **AI model settings** (Otari, O
 ## Check a site in CI
 
 ```yaml
-- uses: <owner>/agent-forge@main
+- uses: ManishAgarwal29/agent-forge@main
   with:
     url: https://your-site.example/your_network
     min-score: 75
