@@ -30,3 +30,12 @@ export function h(tag, props = {}, ...children) {
   }
   return node;
 }
+
+/**
+ * Replace an element's children. Unlike replaceChildren, it skips false, null and
+ * undefined instead of showing them as text, and it flattens nested arrays.
+ */
+export function fill(node, ...children) {
+  node.replaceChildren(...children.flat(Infinity).filter(child => child !== undefined && child !== null && child !== false));
+  return node;
+}

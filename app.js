@@ -4,7 +4,7 @@
 // The page and the assistant share one object, ForgeApp.page. The visitor's controls and the
 // agent's website_* tools (site-actions.js) call the same methods, so the visitor always sees
 // what the agent changed and can undo it.
-import { h } from "./studio/dom.js";
+import { fill, h } from "./studio/dom.js";
 import { buildZip } from "./studio/export.js";
 import { PREVIEW_BASE, Project, isValidName, slug } from "./studio/project.js";
 import { TEMPLATES, getTemplate } from "./studio/templates.js";
@@ -74,7 +74,7 @@ export class ForgeApp {
       tabs: [...this.doc.querySelectorAll("[data-tab]")],
       undo: $("#undo"),
     };
-    this.els.templates.replaceChildren(...TEMPLATES.map(template => h("button", { type: "button", class: "template", onclick: () => this.loadTemplate(template.id) },
+    fill(this.els.templates, ...TEMPLATES.map(template => h("button", { type: "button", class: "template", onclick: () => this.loadTemplate(template.id) },
       h("strong", {}, template.title), h("span", {}, template.blurb))));
     for (const tab of this.els.tabs) {
       tab.addEventListener("click", () => this.showTab(tab.dataset.tab));
@@ -331,7 +331,7 @@ export class ForgeApp {
     const project = this.project;
     const text = (key, props = {}) => h("input", { type: "text", value: project[key], ...props, oninput: event => this.edit(() => { project[key] = event.target.value; }) });
     const area = (key, rows, props = {}) => h("textarea", { rows, value: project[key], ...props, oninput: event => this.edit(() => { project[key] = event.target.value; }) });
-    this.els.site.replaceChildren(
+    fill(this.els.site, 
       field("Site or assistant name", text("brand", { maxlength: 80 })),
       field("Network name", h("input", {
         type: "text", value: project.networkName, maxlength: 40, spellcheck: "false",
@@ -350,11 +350,11 @@ export class ForgeApp {
       field("Site facts", h("textarea", { rows: 12, value: project.facts, oninput: event => this.edit(() => { project.facts = event.target.value; }) }), "Everything the agents may say as fact: prices, hours, policies. Agents answer only from this."),
       field("What this site cannot do", area("notSupported", 2), "For example: take payments, book tables."),
     );
-    this.els.agents.replaceChildren(
+    fill(this.els.agents, 
       ...project.agents.map(agent => this.agentEditor(agent)),
       h("button", { type: "button", onclick: () => this.addAgent() }, "Add an agent"),
     );
-    this.els.peers.replaceChildren(
+    fill(this.els.peers, 
       h("p", { class: "muted" }, "Partner sites your front agent may call, after the visitor agrees on a card. Check a peer first: only add sites that are conformant."),
       ...project.peers.map((peer, index) => this.peerEditor(peer, index)),
       h("button", { type: "button", onclick: () => this.change(p => { p.peers.push({ url: "https://", label: "" }); }) }, "Add a peer"),
@@ -436,12 +436,12 @@ export class ForgeApp {
     const report = this.report;
     const hints = this.project.hints();
     if (!report) {
-      this.els.panel.replaceChildren(h("p", { class: "muted" }, "Checking…"));
+      fill(this.els.panel, h("p", { class: "muted" }, "Checking…"));
       return;
     }
     const verdict = verdictFor(report);
     const open = report.checks.filter(check => check.status !== "pass");
-    this.els.panel.replaceChildren(
+    fill(this.els.panel, 
       h("div", { class: "summary", "data-tone": verdict.tone },
         h("strong", {}, report.conformant ? "Conformant" : "Not conformant yet"),
         h("span", {}, ` ${report.score}/100, grade ${report.grade}. ${report.checks.filter(c => c.status === "pass").length} of ${report.checks.length} checks pass.`)),
@@ -456,7 +456,7 @@ export class ForgeApp {
 
   renderPreview() {
     const frame = h("iframe", { class: "preview", title: "Preview of your agent network", src: new URL("studio/preview.html", import.meta.url).href });
-    this.els.panel.replaceChildren(
+    fill(this.els.panel, 
       h("p", { class: "muted" }, "This chat runs your draft in the browser, the way a visitor's browser would run the published site. Without an AI key saved in the settings below it is a dry run: it shows which agents your network calls, with canned replies. With a key saved, replies are real."),
       h("button", { type: "button", onclick: () => this.renderPreview() }, "Restart with my latest changes"),
       frame);
@@ -469,7 +469,7 @@ export class ForgeApp {
     }
     const select = h("select", { "aria-label": "File", onchange: event => { this.selectedFile = event.target.value; this.renderFiles(); } },
       [...files.keys()].map(path => h("option", { value: path, selected: path === this.selectedFile }, path)));
-    this.els.panel.replaceChildren(
+    fill(this.els.panel, 
       h("p", { class: "muted" }, "The public files your site publishes. Download the folder to get them with a page and the runtime."),
       select,
       h("pre", { class: "file" }, files.get(this.selectedFile)));
