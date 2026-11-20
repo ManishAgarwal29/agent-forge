@@ -16,6 +16,8 @@ const STORE_KEY = "forge.project.v1";
 const MAX_UNDO = 25;
 const LINT_DELAY_MS = 350;
 const EDIT_BURST_MS = 1500;
+/** The lowest score a peer may have. Enforced in setPeers(), whatever the model decides. */
+export const PEER_MIN_SCORE = 60;
 const SITE_KEYS = ["brand", "networkName", "description", "sampleQueries", "facts", "notSupported", "model"];
 
 /** Read and write the draft in localStorage, ignoring storage that is blocked or full. */
@@ -203,8 +205,14 @@ export class ForgeApp {
     return { ok: true, agents: this.project.agents.map(agent => agent.name), front: this.project.front };
   }
 
-  /** Replace the list of partner networks the front agent may call. */
-  setPeers(peers) {
+  /**
+   * Replace the list of partner networks the front agent may call.
+   *
+   * The trust rule is enforced here, in code, not left to the model: every peer is checked
+   * with the validator, and the whole list is refused when any peer is not conformant or
+   * scores under PEER_MIN_SCORE. A peer that cannot be read fails, so the rule fails closed.
+   */
+  async setPeers(peers) {
     const clean = [];
     for (const peer of peers) {
       let url;
@@ -222,10 +230,21 @@ export class ForgeApp {
       }
       clean.push({ url: url.href, label: String(peer.label || url.host).slice(0, 60) });
     }
+    const options = this.options.fetchImpl ? { fetchImpl: this.options.fetchImpl, checkPeers: false } : { checkPeers: false };
+    const results = await Promise.all(clean.map(async peer => {
+      const report = await validateSite(peer.url, options);
+      return { url: peer.url, score: report.score, conformant: report.conformant, failed: report.checks.filter(c => c.status === "fail").map(c => c.id) };
+    }));
+    const refused = results.filter(result => !result.conformant || result.score < PEER_MIN_SCORE);
+    if (refused.length) {
+      const why = refused.map(result => `${result.url} scored ${result.score}${result.conformant ? "" : `, not conformant (fails ${result.failed.join(", ")})`}`).join("; ");
+      this.say(`Peers not changed. Forge only adds peers that are conformant and score ${PEER_MIN_SCORE} or more: ${why}.`, true);
+      return { ok: false, reason: `Nothing changed. Every peer must be conformant with a score of ${PEER_MIN_SCORE} or more. Refused: ${why}.`, checked: results };
+    }
     this.change(project => {
       project.peers = clean;
     });
-    return { ok: true, peers: clean };
+    return { ok: true, peers: clean, checked: results };
   }
 
   /** Check a published site, for the visitor choosing a peer. */

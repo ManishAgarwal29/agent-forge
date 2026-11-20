@@ -79,7 +79,7 @@ class SiteActions {
       },
       {
         name: "set_peers",
-        description: "Replace the list of partner sites the front agent may call. Send every peer to keep, including the existing ones from get_project. Check each new peer with validate_site first.",
+        description: "Replace the list of partner sites the front agent may call. Send every peer to keep, including the existing ones from get_project. Forge checks every peer itself and refuses the whole list, changing nothing, when any peer is not conformant or scores under 60. The result gives each peer's score.",
         effect: "write",
         inputSchema: {
           type: "object",

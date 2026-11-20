@@ -32,7 +32,7 @@ Publishing an agent network today means installing Node, running a coding agent 
 
 - Every change is visible in the workspace and reversible with Undo. Replacing the whole draft with a template is the one `irreversible` action, so the runtime asks first.
 - The agent is told never to invent facts about the visitor's site. Facts come only from the visitor.
-- Before it adds a peer it runs `validate_site` and refuses peers that are not conformant or score under 60.
+- Peers are gated in code, not by the model. `set_peers` checks every peer with the validator and refuses the whole list, changing nothing, when any peer is not conformant or scores under 60. A peer that cannot be read fails. This follows the split Cognizant AI Lab describes for its Arbiter: agents coordinate, deterministic code decides what is binding.
 
 Other sites can load `…/agent_forge` as a peer. Through Forge's action bridge their agents get `validate_site` and `get_starter_templates`.
 

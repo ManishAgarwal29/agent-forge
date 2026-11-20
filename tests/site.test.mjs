@@ -83,11 +83,54 @@ test("the agent's actions edit the draft through the same methods as the page, a
   assert.ok(checked.hints.some(hint => /sample/.test(hint.text)));
 
   assert.equal((await actions.set_peers.execute({ peers: [{ url: "http://insecure.example/x" }] })).ok, false);
-  assert.equal((await actions.set_peers.execute({ peers: [{ url: "https://peer.example/transit", label: "Transit" }] })).ok, true);
-  assert.deepEqual(app.project.peerOrigins(), ["https://peer.example"]);
 
   assert.equal((await actions.load_template.execute({ id: "docs" })).ok, true);
   assert.equal(app.project.networkName, "docs_guide");
+});
+
+/** A fake web: one good peer, one that leaks a credential, and nothing else. */
+function peerWeb() {
+  const good = getTemplate("docs").build();
+  const bad = getTemplate("docs").build();
+  bad.networkName = "leaky";
+  bad.facts = "Admin api_key = sk-abcdefghijklmnopqrstuvwxyz123456";
+  const sites = { "https://good.example": good, "https://bad.example": bad };
+  return async url => {
+    const { origin, pathname } = new URL(url);
+    const project = sites[origin];
+    const body = project?.files().get(pathname.slice(1));
+    return body === undefined
+      ? new Response("not found", { status: 404, headers: { "access-control-allow-origin": "*" } })
+      : new Response(body, { status: 200, headers: { "access-control-allow-origin": "*" } });
+  };
+}
+
+test("set_peers enforces the trust rule in code, whatever the model asks", async () => {
+  const app = new ForgeApp({}, { fetchImpl: peerWeb() });
+  app.project = getTemplate("cafe").build();
+  ForgeApp.page = app;
+  const setPeers = SiteActions.definitions().find(action => action.name === "set_peers");
+
+  const accepted = await setPeers.execute({ peers: [{ url: "https://good.example/docs_guide", label: "Docs" }] });
+  assert.equal(accepted.ok, true, accepted.reason);
+  assert.equal(accepted.checked[0].conformant, true);
+  assert.deepEqual(app.project.peerOrigins(), ["https://good.example"]);
+
+  // One failing peer refuses the whole list and leaves the draft as it was.
+  const leaky = await setPeers.execute({ peers: [{ url: "https://good.example/docs_guide" }, { url: "https://bad.example/leaky" }] });
+  assert.equal(leaky.ok, false);
+  assert.match(leaky.reason, /bad\.example\/leaky/);
+  assert.match(leaky.reason, /safety\.secrets/);
+  assert.deepEqual(app.project.peerOrigins(), ["https://good.example"]);
+
+  // A peer that cannot be read fails closed.
+  const missing = await setPeers.execute({ peers: [{ url: "https://nowhere.example/ghost" }] });
+  assert.equal(missing.ok, false);
+  assert.deepEqual(app.project.peerOrigins(), ["https://good.example"]);
+
+  // An empty list is allowed: removing peers needs no check.
+  assert.equal((await setPeers.execute({ peers: [] })).ok, true);
+  assert.deepEqual(app.project.peers, []);
 });
 
 test("undo restores the previous draft", () => {
