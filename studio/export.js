@@ -31,12 +31,80 @@ main { width: min(960px, 100% - 32px); margin: 0 auto; padding: 32px 0 64px; }
 #agent-app .ns-consent-actions { flex-wrap: wrap; }
 #agent-app .ns-consent-actions button { white-space: nowrap; }
 body > dialog button { margin-right: 8px; }
+/* The page written from the draft: intro, facts and footer. */
+h1 { font-size: clamp(1.8rem, 4vw, 2.6rem); margin: 0 0 8px; line-height: 1.15; }
+h2 { margin: 0 0 12px; }
+.lead { font-size: 1.1rem; max-width: 62ch; }
+.button { display: inline-block; background: #2c4fa3; color: #fff; padding: 9px 16px; border-radius: 10px; text-decoration: none; font-weight: 600; }
+.facts { background: #fff; border: 1px solid #d0d7de; border-radius: 14px; padding: 20px 24px; margin-top: 28px; line-height: 1.55; }
+.facts h3 { margin: 18px 0 6px; font-size: 1.05rem; }
+.facts ul { margin: 0 0 10px; padding-left: 20px; }
+.facts p { margin: 0 0 8px; }
+.cannot { margin-top: 14px; padding: 10px 12px; background: #f6f8fa; border-radius: 10px; }
+.try { margin: 0 0 4px; font-weight: 600; }
+.samples { margin: 0 0 8px; padding-left: 20px; color: #3d444d; }
+footer { width: min(960px, 100% - 32px); margin: 0 auto 40px; color: #59636e; font-size: 0.9rem; }
 @media (max-width: 760px) { .assistant-panels { grid-template-columns: 1fr; } }
 `;
 
-function indexHtml(project) {
+/**
+ * Turn the site facts into HTML, so the page shows people what the agents know.
+ * Plain-text conventions: a short line ending in ":" is a heading, "- " starts a list item,
+ * "Label: value" gets a bold label, and anything else is a paragraph. Everything is escaped.
+ *
+ * :param facts: The facts text.
+ * :return: HTML, or "" when there are no facts.
+ */
+export function factsHtml(facts) {
+  const out = [];
+  let list = [];
+  const flush = () => {
+    if (list.length) {
+      out.push(`      <ul>\n${list.map(item => `        <li>${item}</li>`).join("\n")}\n      </ul>`);
+      list = [];
+    }
+  };
+  const labelled = line => {
+    const match = /^([^:]{2,40}):\s+(.+)$/.exec(line);
+    return match ? `<strong>${escapeHtml(match[1])}:</strong> ${escapeHtml(match[2])}` : escapeHtml(line);
+  };
+  for (const raw of String(facts || "").split(/\r?\n/)) {
+    const line = raw.trim();
+    if (!line) {
+      flush();
+    } else if (/^[-*•]\s+/.test(line)) {
+      list.push(labelled(line.replace(/^[-*•]\s+/, "")));
+    } else if (line.endsWith(":") && line.length <= 60) {
+      flush();
+      out.push(`      <h3>${escapeHtml(line.slice(0, -1))}</h3>`);
+    } else {
+      flush();
+      out.push(`      <p>${labelled(line)}</p>`);
+    }
+  }
+  flush();
+  return out.join("\n");
+}
+
+function indexHtml(project, options = {}) {
   const brand = escapeHtml(project.brand);
   const description = escapeHtml(project.description || "Ask this site's assistant.");
+  const facts = factsHtml(project.facts);
+  const samples = project.sampleQueries.map(query => `        <li>${escapeHtml(query)}</li>`).join("\n");
+  const cannot = project.notSupported.trim() ? `\n      <p class="cannot"><strong>Not available here:</strong> this site cannot ${escapeHtml(project.notSupported.trim())}</p>` : "";
+  const factsSection = facts ? `
+    <section class="facts" aria-labelledby="facts-heading">
+      <h2 id="facts-heading">About us</h2>
+${facts}${cannot}
+    </section>` : "";
+  const samplesBlock = samples ? `
+      <p class="try">Try asking:</p>
+      <ul class="samples">
+${samples}
+      </ul>` : "";
+  const credit = options.forgeUrl
+    ? `\n  <footer><p>Made with <a href="${escapeHtml(options.forgeUrl)}">Agent Forge</a>. The assistant runs in your browser and answers only from the facts on this page.</p></footer>`
+    : "";
   return `<!doctype html>
 <html lang="en">
 <head>
@@ -49,13 +117,16 @@ function indexHtml(project) {
 </head>
 <body>
   <main>
-    <h1>${brand}</h1>
-    <p>${description}</p>
-    <!-- Replace this page with your own content, or copy the section below, assistant.css
-         and the <script> tag into your existing page. Keep the ids: site.js uses
-         #assistant-status and #agent-app. -->
+    <header class="intro">
+      <h1>${brand}</h1>
+      <p class="lead">${description}</p>
+      <p><a class="button" href="#assistant">Ask the assistant</a></p>
+    </header>
+    <!-- This page was written from your Forge draft. Edit it freely, or copy the assistant
+         section below, assistant.css and the <script> tag into your existing page. Keep
+         the ids: site.js uses #assistant-status and #agent-app. -->${factsSection}
     <section id="assistant" class="assistant" aria-labelledby="assistant-heading">
-      <h2 id="assistant-heading">Ask ${brand}</h2>
+      <h2 id="assistant-heading">Ask ${brand}</h2>${samplesBlock}
       <p class="assistant-note">Your messages go to the AI provider you choose in the settings below. This site does not pay for them and never sees your key.</p>
       <p id="assistant-status" role="status">Connecting the assistant… If this message stays, the assistant could not load.</p>
       <div id="agent-app">
@@ -67,7 +138,7 @@ function indexHtml(project) {
         <div data-ns-slot="settings"></div>
       </div>
     </section>
-  </main>
+  </main>${credit}
 </body>
 </html>
 `;
@@ -115,7 +186,7 @@ Specification for a Worldwide Agentic Web (Profile 0.3).
 
 - \`agent-manifest.json\`, \`${project.networkName}.network.json\`, \`links.json\`: the public description of your agent network.
 - \`runtime/\`: the browser runtime (nsdeploy, Apache 2.0). It runs the network in the visitor's browser, on the visitor's own AI key.
-- \`index.html\`, \`site.js\`, \`assistant.css\`: a page that mounts the assistant. Replace the page, or copy the assistant section into your own.
+- \`index.html\`, \`site.js\`, \`assistant.css\`: a page written from your draft: your description, your facts, sample questions and the assistant. Edit it freely, or copy the assistant section into your own page.
 - \`forge-project.json\`: your draft. Open it again in Agent Forge with **Import**.
 
 ## Publish on GitHub Pages
@@ -138,15 +209,16 @@ Specification for a Worldwide Agentic Web (Profile 0.3).
 /**
  * :param project: A Project.
  * :param runtime: {paths: string[], read: (path) => Promise<string>} for the runtime folder.
+ * :param options: {forgeUrl} to credit Agent Forge in the page footer.
  * :return: [{path, data}] ready for createZip.
  */
-export async function buildBundle(project, runtime) {
+export async function buildBundle(project, runtime, options = {}) {
   const entries = [];
   for (const [path, data] of project.files()) {
     entries.push({ path, data });
   }
   entries.push(
-    { path: "index.html", data: indexHtml(project) },
+    { path: "index.html", data: indexHtml(project, options) },
     { path: "site.js", data: siteJs(project) },
     { path: "assistant.css", data: ASSISTANT_CSS },
     { path: "README.md", data: readme(project) },
@@ -159,6 +231,6 @@ export async function buildBundle(project, runtime) {
   return entries;
 }
 
-export async function buildZip(project, runtime) {
-  return createZip(await buildBundle(project, runtime));
+export async function buildZip(project, runtime, options = {}) {
+  return createZip(await buildBundle(project, runtime, options));
 }

@@ -498,7 +498,7 @@ export class ForgeApp {
           return response.text();
         },
       };
-      const zip = await buildZip(this.project, runtime);
+      const zip = await buildZip(this.project, runtime, { forgeUrl: base.href });
       const link = h("a", { href: URL.createObjectURL(new Blob([zip], { type: "application/zip" })), download: `${this.project.networkName}-site.zip` });
       this.doc.body.append(link);
       link.click();

@@ -2,7 +2,7 @@ import assert from "node:assert/strict";
 import { crc32 as nodeCrc32 } from "node:zlib";
 import { test } from "node:test";
 import { validateSite } from "../validator/validator.js";
-import { buildBundle, buildZip } from "../studio/export.js";
+import { buildBundle, buildZip, factsHtml } from "../studio/export.js";
 import { PREVIEW_BASE, Project, isValidName, slug } from "../studio/project.js";
 import { TEMPLATES, getTemplate } from "../studio/templates.js";
 import { createVirtualFetch } from "../studio/virtual-site.js";
@@ -108,6 +108,31 @@ test("zip entries have correct CRCs and a valid directory", () => {
   const centralOffset = view.getUint32(zip.length - 22 + 16, true);
   assert.equal(view.getUint32(centralOffset, true), 0x02014b50);
   assert.equal(view.getUint32(centralOffset + 16, true), nodeCrc32("hello"));
+});
+
+test("facts become headings, lists, labels and paragraphs, all escaped", () => {
+  const html = factsHtml("Opening hours: 8 to 5\n\nMenu:\n- Soup, 6.00\n- <b>Cake</b>\nWe bake daily & early.");
+  assert.match(html, /<p><strong>Opening hours:<\/strong> 8 to 5<\/p>/);
+  assert.match(html, /<h3>Menu<\/h3>/);
+  assert.match(html, /<li>Soup, 6\.00<\/li>/);
+  assert.match(html, /<li>&lt;b&gt;Cake&lt;\/b&gt;<\/li>/);
+  assert.match(html, /<p>We bake daily &amp; early\.<\/p>/);
+  assert.equal(factsHtml(""), "");
+});
+
+test("the page shows the facts, the sample questions, the limits and the credit", async () => {
+  const project = getTemplate("cafe").build();
+  project.sampleQueries = ["<script>x</script>?"];
+  const entries = await buildBundle(project, { paths: [], read: async () => "" }, { forgeUrl: "https://forge.example/" });
+  const page = entries.find(entry => entry.path === "index.html").data;
+  assert.match(page, /<h2 id="facts-heading">About us<\/h2>/);
+  assert.match(page, /Tomato Soup, 6\.50/);
+  assert.match(page, /&lt;script&gt;x&lt;\/script&gt;\?/);
+  assert.match(page, /Not available here:/);
+  assert.match(page, /Made with <a href="https:\/\/forge\.example\/">Agent Forge<\/a>/);
+  const bare = Project.blank();
+  const plain = (await buildBundle(bare, { paths: [], read: async () => "" })).find(entry => entry.path === "index.html").data;
+  assert.doesNotMatch(plain, /About us|Made with/);
 });
 
 test("the bundle holds the data files, the page, the runtime and the draft", async () => {
