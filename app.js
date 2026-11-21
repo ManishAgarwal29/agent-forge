@@ -496,7 +496,7 @@ export class ForgeApp {
     await this.lint();
     const blocker = this.report.checks.find(check => check.status === "fail");
     if (blocker) {
-      const message = `Not downloaded. ${blocker.title} fails${blocker.detail ? `: ${blocker.detail}` : "."} ${blocker.fix}`;
+      const message = `Not downloaded: your draft fails a required check. ${blocker.detail ? `${blocker.detail}. ` : `${blocker.title}. `}${blocker.fix}`;
       this.say(message, true);
       return { ok: false, reason: message };
     }
