@@ -96,6 +96,7 @@ class SiteActions {
                 properties: {
                   url: { type: "string", maxLength: 300, description: "Network URL: the folder that holds agent-manifest.json, then the network name." },
                   label: { type: "string", maxLength: 60, description: "Name shown on the consent card." },
+                  purpose: { type: "string", maxLength: 200, description: "What visitors should be sent to this peer for, such as \"cakes, coffee and opening hours\". Forge writes it into the front agent's instructions." },
                 },
               },
             },

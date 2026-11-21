@@ -33,6 +33,24 @@ test("the front agent comes first and peers become its tools and labels", () => 
   assert.doesNotMatch(network.tools[1].instructions, /Partner tools ask/);
 });
 
+test("a peer's purpose tells the front agent when to call it, by the runtime's tool name", async () => {
+  const { peerToolName } = await import("../studio/project.js");
+  const { safeName } = await import("../runtime/runner.js");
+  const { parseExternalAgent } = await import("../runtime/kernel.js");
+  const url = "https://manishagarwal29.github.io/kettle-and-crumb-agent/kettle_and_crumb";
+  assert.equal(peerToolName(url), safeName(parseExternalAgent(url, "https://x.example").agentName));
+
+  const project = getTemplate("docs").build();
+  project.peers = [{ url, label: "Kettle & Crumb", purpose: "cakes, coffee and pastries" }];
+  const front = project.buildNetwork().tools[0].instructions;
+  assert.match(front, /For cakes, coffee and pastries, ask the Kettle & Crumb partner with the kettle_and_crumb_agent_kettle_and_crumb tool/);
+  assert.ok(!project.hints().some(h => /what to ask/i.test(h.text)));
+
+  project.peers[0].purpose = "";
+  assert.doesNotMatch(project.buildNetwork().tools[0].instructions, /Partner sites:/);
+  assert.ok(project.hints().some(h => /Say what to ask Kettle & Crumb about/.test(h.text)));
+});
+
 test("a peer the draft lists is checked against its allowed_peers by the linter", async () => {
   const project = getTemplate("blank").build();
   project.peers = [{ url: "https://peer.example/transit", label: "Transit" }];

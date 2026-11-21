@@ -230,7 +230,7 @@ export class ForgeApp {
       if (url.pathname.endsWith("/") || url.search || url.hash) {
         return { ok: false, reason: `${url.href} must end in the network name, with no trailing slash, query or #.` };
       }
-      clean.push({ url: url.href, label: String(peer.label || url.host).slice(0, 60) });
+      clean.push({ url: url.href, label: String(peer.label || url.host).slice(0, 60), purpose: String(peer.purpose || "").slice(0, 200) });
     }
     const results = await this.peerChecker.checkAll(clean, { fresh: true });
     const refused = results.filter(result => !peerPasses(result));
@@ -363,7 +363,7 @@ export class ForgeApp {
     fill(this.els.peers, 
       h("p", { class: "muted" }, `Partner sites your front agent may call, after the visitor agrees on a card. Forge checks every peer: a peer that is not conformant, or scores under ${PEER_MIN_SCORE}, fails your draft's checks and blocks the download.`),
       ...project.peers.map((peer, index) => this.peerEditor(peer, index)),
-      h("button", { type: "button", onclick: () => this.change(p => { p.peers.push({ url: "https://", label: "" }); }) }, "Add a peer"),
+      h("button", { type: "button", onclick: () => this.change(p => { p.peers.push({ url: "https://", label: "", purpose: "" }); }) }, "Add a peer"),
     );
     this.els.undo.disabled = this.undoStack.length === 0;
   }
@@ -422,6 +422,7 @@ export class ForgeApp {
     return h("div", { class: "peer" },
       field("Network URL", h("input", { type: "url", value: peer.url, placeholder: "https://site.example/network_name", oninput: event => this.edit(() => { peer.url = event.target.value.trim(); }) })),
       field("Name shown on the consent card", h("input", { type: "text", value: peer.label, maxlength: 60, oninput: event => this.edit(() => { peer.label = event.target.value; }) })),
+      field("What to ask this peer about", h("input", { type: "text", value: peer.purpose || "", maxlength: 200, placeholder: "For example: cakes, coffee and opening hours", oninput: event => this.edit(() => { peer.purpose = event.target.value; }) }), "Forge tells your front agent to ask this peer about these things."),
       h("div", { class: "row" },
         h("button", { type: "button", onclick: async () => {
           result.textContent = "Checking…";

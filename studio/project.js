@@ -38,6 +38,20 @@ export function slug(text, fallback = "my_site") {
   return NAME_PATTERN.test(value) ? value : fallback;
 }
 
+/**
+ * The tool name the browser runtime gives a peer network: its URL path with every other
+ * character turned into "_" (runtime/runner.js, safeName). The model calls the peer by it.
+ */
+export function peerToolName(url) {
+  let path = "";
+  try {
+    path = new URL(url).pathname.replace(/^\//, "");
+  } catch {
+    return "";
+  }
+  return path.replace(/[^A-Za-z0-9_]/g, "_").replace(/^_+/, "").slice(0, 60) || "tool";
+}
+
 export function isValidName(name) {
   return NAME_PATTERN.test(String(name || ""));
 }
@@ -60,7 +74,7 @@ export class Project {
     this.agents = (Array.isArray(data.agents) ? data.agents : []).slice(0, 12).map(Project.cleanAgent);
     this.front = data.front || (this.agents[0] && this.agents[0].name) || "";
     this.peers = (Array.isArray(data.peers) ? data.peers : []).slice(0, 6)
-      .map(peer => ({ url: text(peer?.url, 300).trim(), label: text(peer?.label, 60).trim() }))
+      .map(peer => ({ url: text(peer?.url, 300).trim(), label: text(peer?.label, 60).trim(), purpose: text(peer?.purpose, 200).trim() }))
       .filter(peer => peer.url);
   }
 
@@ -160,6 +174,11 @@ export class Project {
       parts.push(`This site cannot: ${this.notSupported.trim()}\nWhen a visitor asks for something it cannot do, say so plainly.`);
     }
     if (agent.name === this.front && this.peers.length) {
+      const uses = this.peers.filter(peer => peer.purpose).map(peer =>
+        `- For ${peer.purpose}, ask the ${peer.label || "partner"} partner with the ${peerToolName(peer.url)} tool, and pass on what it says. Do this even though it is not in the site facts.`);
+      if (uses.length) {
+        parts.push(`Partner sites:\n${uses.join("\n")}`);
+      }
       parts.push(PARTNER_RULES);
     }
     if (agent.useFacts && this.facts.trim()) {
@@ -337,6 +356,9 @@ export class Project {
       }
       if (!peer.label) {
         add("warn", `Give peer ${parsed.host} a name. It is what the visitor sees on the consent card.`);
+      }
+      if (!peer.purpose) {
+        add("warn", `Say what to ask ${peer.label || parsed.host} about, such as "cakes and coffee". Without it, your front agent does not know when to call it.`);
       }
     }
     return hints;
