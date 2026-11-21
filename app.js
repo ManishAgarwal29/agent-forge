@@ -11,13 +11,14 @@ import { TEMPLATES, getTemplate } from "./studio/templates.js";
 import { createVirtualFetch } from "./studio/virtual-site.js";
 import { clip, compactReport } from "./validator/compact.js";
 import { validateSite, verdictFor } from "./validator/validator.js";
+import { PEER_MIN_SCORE, PeerChecker, applyPeerGate, describePeer, peerPasses } from "./studio/peer-gate.js";
 
 const STORE_KEY = "forge.project.v1";
 const MAX_UNDO = 25;
 const LINT_DELAY_MS = 350;
 const EDIT_BURST_MS = 1500;
-/** The lowest score a peer may have. Enforced in setPeers(), whatever the model decides. */
-export const PEER_MIN_SCORE = 60;
+/** The lowest score a peer may have. See studio/peer-gate.js. */
+export { PEER_MIN_SCORE };
 const SITE_KEYS = ["brand", "networkName", "description", "sampleQueries", "facts", "notSupported", "model"];
 
 /** Read and write the draft in localStorage, ignoring storage that is blocked or full. */
@@ -60,6 +61,7 @@ export class ForgeApp {
     this.tab = "checks";
     this.selectedFile = "";
     this.runtimeList = null;
+    this.peerChecker = new PeerChecker(options.fetchImpl ? { fetchImpl: options.fetchImpl } : {});
   }
 
   init() {
@@ -230,14 +232,10 @@ export class ForgeApp {
       }
       clean.push({ url: url.href, label: String(peer.label || url.host).slice(0, 60) });
     }
-    const options = this.options.fetchImpl ? { fetchImpl: this.options.fetchImpl, checkPeers: false } : { checkPeers: false };
-    const results = await Promise.all(clean.map(async peer => {
-      const report = await validateSite(peer.url, options);
-      return { url: peer.url, score: report.score, conformant: report.conformant, failed: report.checks.filter(c => c.status === "fail").map(c => c.id) };
-    }));
-    const refused = results.filter(result => !result.conformant || result.score < PEER_MIN_SCORE);
+    const results = await this.peerChecker.checkAll(clean, { fresh: true });
+    const refused = results.filter(result => !peerPasses(result));
     if (refused.length) {
-      const why = refused.map(result => `${result.url} scored ${result.score}${result.conformant ? "" : `, not conformant (fails ${result.failed.join(", ")})`}`).join("; ");
+      const why = refused.map(describePeer).join("; ");
       this.say(`Peers not changed. Forge only adds peers that are conformant and score ${PEER_MIN_SCORE} or more: ${why}.`, true);
       return { ok: false, reason: `Nothing changed. Every peer must be conformant with a score of ${PEER_MIN_SCORE} or more. Refused: ${why}.`, checked: results };
     }
@@ -270,13 +268,21 @@ export class ForgeApp {
     this.lintTimer = setTimeout(() => this.lint(), delay);
   }
 
+  /**
+   * Check the draft: the specification checks on the files it would publish, then Forge's
+   * peer rule on every peer it lists, however the peer was added.
+   */
   async lint() {
     const run = (this.lintRun += 1);
     const files = this.project.files();
-    const report = await validateSite(`${PREVIEW_BASE}/${this.project.networkName}`, {
-      fetchImpl: createVirtualFetch(PREVIEW_BASE, files),
-      checkPeers: false,
-    });
+    const [draft, peers] = await Promise.all([
+      validateSite(`${PREVIEW_BASE}/${this.project.networkName}`, {
+        fetchImpl: createVirtualFetch(PREVIEW_BASE, files),
+        checkPeers: false,
+      }),
+      this.peerChecker.checkAll(this.project.peers),
+    ]);
+    const report = applyPeerGate(draft, peers);
     if (run === this.lintRun) {
       this.report = report;
       if (!this.els) {
@@ -355,7 +361,7 @@ export class ForgeApp {
       h("button", { type: "button", onclick: () => this.addAgent() }, "Add an agent"),
     );
     fill(this.els.peers, 
-      h("p", { class: "muted" }, "Partner sites your front agent may call, after the visitor agrees on a card. Check a peer first: only add sites that are conformant."),
+      h("p", { class: "muted" }, `Partner sites your front agent may call, after the visitor agrees on a card. Forge checks every peer: a peer that is not conformant, or scores under ${PEER_MIN_SCORE}, fails your draft's checks and blocks the download.`),
       ...project.peers.map((peer, index) => this.peerEditor(peer, index)),
       h("button", { type: "button", onclick: () => this.change(p => { p.peers.push({ url: "https://", label: "" }); }) }, "Add a peer"),
     );
@@ -420,10 +426,12 @@ export class ForgeApp {
         h("button", { type: "button", onclick: async () => {
           result.textContent = "Checking…";
           try {
-            const report = await validateSite(peer.url);
-            const verdict = verdictFor(report);
-            result.textContent = `${verdict.label}: ${report.score}/100${report.conformant ? "" : `. Fails ${report.checks.filter(c => c.status === "fail").map(c => c.id).join(", ")}`}`;
+            // A fresh check, which also refreshes the result the draft checks use.
+            const checked = await this.peerChecker.check(peer.url, { fresh: true });
+            const verdict = verdictFor(checked);
+            result.textContent = `${verdict.label}: ${checked.score}/100${checked.conformant ? "" : `. Fails ${checked.failed.join(", ")}`}`;
             result.dataset.tone = verdict.tone;
+            this.scheduleLint(0);
           } catch {
             result.textContent = "Could not check this address.";
           }
@@ -481,7 +489,16 @@ export class ForgeApp {
     const problems = this.project.hints().filter(hint => hint.level === "error");
     if (problems.length) {
       this.say(`Fix this first: ${problems[0].text}`, true);
-      return;
+      return { ok: false, reason: problems[0].text };
+    }
+    // Check again now, so a peer that went down or a draft edited a moment ago is caught.
+    this.say("Checking your draft and its peers…");
+    await this.lint();
+    const blocker = this.report.checks.find(check => check.status === "fail");
+    if (blocker) {
+      const message = `Not downloaded. ${blocker.title} fails${blocker.detail ? `: ${blocker.detail}` : "."} ${blocker.fix}`;
+      this.say(message, true);
+      return { ok: false, reason: message };
     }
     this.say("Building your folder…");
     try {

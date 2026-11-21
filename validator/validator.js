@@ -58,6 +58,40 @@ export function gradeFor(score) {
 }
 
 /**
+ * Score a list of checks: each category and the whole list, 0 to 100. A failed MUST makes
+ * the list non-conformant and caps the score at NON_CONFORMANT_CAP.
+ *
+ * :param checks: [{category, level, status}]
+ * :return: {score, grade, conformant, categories}
+ */
+export function scoreChecks(checks) {
+  const tally = () => ({ earned: 0, total: 0 });
+  const all = tally();
+  const byCategory = {};
+  for (const check of checks) {
+    const weight = WEIGHTS[check.level];
+    const bucket = byCategory[check.category] || (byCategory[check.category] = tally());
+    bucket.total += weight;
+    all.total += weight;
+    if (check.status === "pass") {
+      bucket.earned += weight;
+      all.earned += weight;
+    }
+  }
+  const percent = bucket => (bucket.total ? Math.round((100 * bucket.earned) / bucket.total) : 100);
+  const categories = {};
+  for (const [name, bucket] of Object.entries(byCategory)) {
+    categories[name] = percent(bucket);
+  }
+  const conformant = !checks.some(check => check.status === "fail");
+  let overall = percent(all);
+  if (!conformant) {
+    overall = Math.min(overall, NON_CONFORMANT_CAP);
+  }
+  return { score: overall, grade: gradeFor(overall), conformant, categories };
+}
+
+/**
  * Collects checks and turns them into a report.
  *
  * Each check has a requirement level. A passed check earns its weight. A failed MUST is a
@@ -95,30 +129,7 @@ class Report {
 
   /** Score each category and the whole report, 0 to 100. */
   score() {
-    const tally = () => ({ earned: 0, total: 0 });
-    const all = tally();
-    const byCategory = {};
-    for (const check of this.checks) {
-      const weight = WEIGHTS[check.level];
-      const bucket = byCategory[check.category] || (byCategory[check.category] = tally());
-      bucket.total += weight;
-      all.total += weight;
-      if (check.status === "pass") {
-        bucket.earned += weight;
-        all.earned += weight;
-      }
-    }
-    const percent = bucket => (bucket.total ? Math.round((100 * bucket.earned) / bucket.total) : 100);
-    const categories = {};
-    for (const [name, bucket] of Object.entries(byCategory)) {
-      categories[name] = percent(bucket);
-    }
-    const conformant = this.failed.length === 0;
-    let overall = percent(all);
-    if (!conformant) {
-      overall = Math.min(overall, NON_CONFORMANT_CAP);
-    }
-    return { score: overall, grade: gradeFor(overall), conformant, categories };
+    return scoreChecks(this.checks);
   }
 }
 
